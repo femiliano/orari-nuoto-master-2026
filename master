@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Orari Allenamenti Nuoto Master</title>
+  <style>
+    body { font-family: Arial, Helvetica, sans-serif; background: #f4f6f8; margin:0; padding:10px; }
+    h1,h2,h3 { text-align:center; }
+    .container { max-width:100%; margin:0 auto; background:#fff; padding:15px; border-radius:10px; box-shadow:0 4px 10px rgba(0,0,0,0.1); }
+    table { width:100%; border-collapse:collapse; margin-top:15px; font-size:14px; }
+    th,td { border:1px solid #ddd; padding:6px; text-align:center; }
+    th { background:#1e90ff; color:#fff; }
+    td input, textarea { width:100%; padding:6px; box-sizing:border-box; font-size:14px; }
+    button { background:#1e90ff; color:white; border:none; padding:10px; margin:5px 2px; border-radius:6px; cursor:pointer; font-size:14px; width:100%; }
+    .actions { margin-top:15px; }
+    @media(min-width:768px){ button{width:auto;} }
+  </style>
+</head>
+<body>
+  <h1>Orari Settimanali Allenamenti Nuoto Master</h1>
+  <h2 id="currentMonth"></h2>
+  <div class="container">
+    <div id="weekSelector" style="margin-bottom:15px;text-align:center"></div>
+    <div id="weeklyNotes" style="margin-bottom:20px">
+      <h3>Note settimanali</h3>
+      <textarea id="notesInput" style="width:100%;min-height:80px" placeholder="Inserisci note per la settimana selezionata"></textarea>
+    </div>
+    <div id="allWeeksNotes" style="margin-bottom:30px"></div>
+
+    <table id="scheduleTable">
+      <thead>
+        <tr>
+          <th rowspan="2">Giorno</th>
+          <th colspan="2">Mattina</th>
+          <th colspan="2">Pranzo</th>
+          <th colspan="2">Sera</th>
+        </tr>
+        <tr>
+          <th>Orario</th><th>Allenatore</th>
+          <th>Orario</th><th>Allenatore</th>
+          <th>Orario</th><th>Allenatore</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>Lunedì</td><td><input></td><td><input></td><td><input></td><td><input></td><td><input></td><td><input></td></tr>
+        <tr><td>Martedì</td><td><input></td><td><input></td><td><input></td><td><input></td><td><input></td><td><input></td></tr>
+        <tr><td>Mercoledì</td><td><input></td><td><input></td><td><input></td><td><input></td><td><input></td><td><input></td></tr>
+        <tr><td>Giovedì</td><td><input></td><td><input></td><td><input></td><td><input></td><td><input></td><td><input></td></tr>
+        <tr><td>Venerdì</td><td><input></td><td><input></td><td><input></td><td><input></td><td><input></td><td><input></td></tr>
+        <tr><td>Sabato</td><td><input></td><td><input></td><td><input></td><td><input></td><td><input></td><td><input></td></tr>
+      </tbody>
+    </table>
+
+    <div class="actions">
+      <button onclick="saveSchedule()">Salva Orari</button>
+      <button onclick="loadSchedule()">Carica Orari</button>
+      <button onclick="shareWhatsApp()">Condividi su WhatsApp</button>
+    </div>
+  </div>
+
+  <script>
+    const GOOGLE_SHEETS_URL = 'https://script.google.com/macros/s/AKfycbwXJ2EcS5etGnnUdLcGlueA7ZQ0QZ8d67CpfSGgQgXO1H_qVfIZzDA72WbsrMw-VjkE/exec';
+    let currentWeekIndex = 0;
+
+    function getWeeksOfMonth(year, month) {
+      const weeks = [];
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month+1, 0);
+      let current = new Date(firstDay);
+      current.setDate(current.getDate() - ((current.getDay()+6)%7));
+      while(current <= lastDay){
+        const start = new Date(current);
+        const end = new Date(current); end.setDate(end.getDate()+6);
+        weeks.push({start,end});
+        current.setDate(current.getDate()+7);
+      }
+      return weeks;
+    }
+
+    function renderCurrentMonth(){
+      const now=new Date();
+      const monthNames=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+      document.getElementById('currentMonth').textContent=`Programmazione settimanale - ${monthNames[now.getMonth()]} ${now.getFullYear()}`;
+      const weeks=getWeeksOfMonth(now.getFullYear(),now.getMonth());
+      window._weeks=weeks;
+      document.getElementById('weekSelector').innerHTML=weeks.map((w,i)=>`<button onclick="selectWeek(${i})">Settimana ${i+1}<br><small>${w.start.toLocaleDateString()} - ${w.end.toLocaleDateString()}</small></button>`).join('');
+      renderAllWeeksNotes();
+    }
+
+    function saveToGoogleSheets(payload){
+      if(GOOGLE_SHEETS_URL.includes('INCOLLA')) return;
+      fetch(GOOGLE_SHEETS_URL, {
+  method: 'POST',
+  mode: 'no-cors',
+  body: JSON.stringify(payload)
+});
+    }
+
+    function saveSchedule(){
+      const rows=document.querySelectorAll('#scheduleTable tbody tr');
+      const allData=JSON.parse(localStorage.getItem('orariNuotoMaster'))||{};
+      const weekData=[];
+      rows.forEach(row=>{const cells=row.querySelectorAll('td'); weekData.push({ giorno:cells[0].innerText, mattina:{orario:cells[1].querySelector('input').value,allenatore:cells[2].querySelector('input').value}, pranzo:{orario:cells[3].querySelector('input').value,allenatore:cells[4].querySelector('input').value}, sera:{orario:cells[5].querySelector('input').value,allenatore:cells[6].querySelector('input').value} });});
+      allData[currentWeekIndex]=allData[currentWeekIndex]||{};
+      allData[currentWeekIndex].schedule=weekData;
+      allData[currentWeekIndex].notes=document.getElementById('notesInput').value;
+      localStorage.setItem('orariNuotoMaster',JSON.stringify(allData));
+      saveToGoogleSheets({week:currentWeekIndex+1,data:allData[currentWeekIndex]});
+      renderAllWeeksNotes();
+      alert('Orari salvati su browser e Google Sheets');
+    }
+
+    function loadSchedule(){
+      const allData=JSON.parse(localStorage.getItem('orariNuotoMaster'))||{};
+      const weekObj=allData[currentWeekIndex];
+      const data=weekObj?weekObj.schedule:null;
+      const rows=document.querySelectorAll('#scheduleTable tbody tr');
+      rows.forEach((row,index)=>{const cells=row.querySelectorAll('td'); if(!data){cells.forEach((c,i)=>{if(i>0)c.querySelector('input').value='';});return;} cells[1].querySelector('input').value=data[index].mattina.orario; cells[2].querySelector('input').value=data[index].mattina.allenatore; cells[3].querySelector('input').value=data[index].pranzo.orario; cells[4].querySelector('input').value=data[index].pranzo.allenatore; cells[5].querySelector('input').value=data[index].sera.orario; cells[6].querySelector('input').value=data[index].sera.allenatore;});
+      document.getElementById('notesInput').value=weekObj&&weekObj.notes?weekObj.notes:'';
+    }
+
+    function selectWeek(index){ currentWeekIndex=index; loadSchedule(); }
+
+    function renderAllWeeksNotes(){
+      const allData=JSON.parse(localStorage.getItem('orariNuotoMaster'))||{};
+      const container=document.getElementById('allWeeksNotes');
+      if(!window._weeks) return;
+      let html='<h3>Riepilogo note del mese</h3>';
+      window._weeks.forEach((w,i)=>{const note=allData[i]&&allData[i].notes?allData[i].notes:'—'; html+=`<div style="padding:8px;border:1px solid #ddd;border-radius:6px;margin-bottom:6px;background:#fafafa"><strong>Settimana ${i+1} (${w.start.toLocaleDateString()} - ${w.end.toLocaleDateString()}):</strong><br>${note}</div>`;});
+      container.innerHTML=html;
+    }
+
+    function shareWhatsApp(){
+      const text=document.getElementById('currentMonth').innerText+'\nConsulta gli orari settimanali di nuoto master.';
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`,'_blank');
+    }
+
+    renderCurrentMonth();
+  </script>
+</body>
+</html>
